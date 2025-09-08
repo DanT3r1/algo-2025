@@ -1,41 +1,37 @@
 #pragma once
 
+#include <ostream>
+#include <string>
 #include <vector>
 
-#include "./detail/exceptions.hpp"
-#include "./files/directory.hpp"
+#include "detail/exceptions.hpp"
+#include "files/directory.hpp"
 
 namespace filesystem {
 
 class Fs {
 public:
-    void ChangeDir(const std::string& /*path*/);
+    Fs();
+    ~Fs();
 
-    void PWD() const;
+    void ChangeDir(const std::string& path);  // NOLINT(readability-make-member-function-const)
+    std::string PWD() const;
 
-    void RemoveFile(const std::string& /*path*/);
+    void ListFiles(const std::string& path = ".") const;
+    void MakeDir(const std::string& path, bool create_parents = false);
 
-    void ListFiles(const std::string& /*path = "."*/) const;
+    void CreateFile(const std::string& path, bool overwrite = false);
+    void WriteToFile(const std::string& path, bool overwrite, std::ostream& in);
+    void ShowFileContent(const std::string& path) const;
 
-    void MakeDir(const std::string& /*path*/, bool /*is_create_parents = false*/);
-
-    void CreateFile(const std::string& /*path = "."*/, bool /*is_overwrite = false*/);
-
-    void WriteToFile(const std::string& /*filename*/, bool /*is_overwrite = false*/, std::ostringstream& /*stream*/
-    );
-
-    void ShowFileContent(const std::string& /*path*/);
-
-    void FindFile(const std::string& /*filename*/);
+    void RemoveFile(const std::string& path);
+    void FindFile(const std::string& filename) const;
 
 private:
-    std::vector<std::string> Split(const std::string& /*str*/, const std::string& /*splitter*/);
-
-private:
-    /*
-    filesystem::files::Directory* root;
-    filesystem::files::Directory* current;
-    */
+    std::vector<std::string> Split(const std::string& s, const std::string& sep) const;
+    Directory* Navigate(const std::string& path, bool create_parents);
+    Directory* root_;
+    Directory* current_;
 };
 
-}  // end namespace filesystem
+}  // namespace filesystem
