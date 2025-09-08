@@ -1,22 +1,21 @@
 #pragma once
 
-#include <vector>
+#include <string>
 
-#include "../fs.hpp"
 #include "../map/map.hpp"
 #include "file.hpp"
 
 namespace filesystem {
 
 class Directory {
-    friend class Fs;
+public:
+    std::string name_;
+    Directory* parent_;
+    Map<std::string, Directory*> childs_;
+    Map<std::string, File> files_;
 
-    void GetName() const;
-
-private:
-    Directory* parent;
-    Map<std::string, Directory*> childs;
-    Map<std::string, File> files;
+    Directory(const std::string& name, Directory* parent);
+    ~Directory();
 };
 
-}  // end namespace filesystem
+}  // namespace filesystem
