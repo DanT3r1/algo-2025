@@ -2,16 +2,23 @@
 
 #include <exception>
 #include <string>
+#include <string_view>
 
-class ListIsEmptyException : std::exception {
+class ListIsEmptyException : public std::exception {
 public:
-    explicit ListIsEmptyException(const std::string& text) : error_message_(text) {
+    ListIsEmptyException() noexcept : msg_("List is empty") {
+    }
+    explicit ListIsEmptyException(const char* m) : msg_(m) {
+    }
+    explicit ListIsEmptyException(std::string m) : msg_(std::move(m)) {
+    }
+    explicit ListIsEmptyException(std::string_view m) : msg_(m) {
     }
 
     const char* what() const noexcept override {
-        return error_message_.data();
+        return msg_.c_str();
     }
 
 private:
-    std::string_view error_message_;
+    std::string msg_;
 };
