@@ -1,0 +1,12 @@
+{
+  "lint_files": ["stack.hpp"],
+  "submit_files": ["stack.hpp"],
+  "forbidden": [
+    {
+      "patterns": [
+        "std::stack"
+      ],
+      "hint": "Don't use std::stack"
+    }
+  ]
+}

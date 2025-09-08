@@ -1,0 +1,57 @@
+name: C/C++ CI
+
+on:
+  pull_request:
+
+jobs:
+  Check:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Clippy
+      run: |
+          git submodule init
+          git submodule update --remote --merge
+          chmod +x ./install_client.sh
+          chmod +x ./client/install.py
+          sudo bash ./docker/image/install_deps.sh
+          echo "Y" | bash ./install_client.sh
+
+    - name: Run Cmake
+      run: |
+          ./client/bin/clippy cmake
+
+    - name: Run clang-format && clang-tidy
+      run: |
+            git fetch origin master:refs/remotes/origin/master
+            BRANCH_VAR=$(git rev-parse origin/master)
+            CURRENT_BRANCH=$(git branch --show-current)
+            echo ${CURRENT_BRANCH}
+            LIST_CHECK_FILES=$(git diff --name-only ${BRANCH_VAR} -- tasks/${CURRENT_BRANCH} | grep '\.cpp\|\.h\|\.hpp' | xargs dirname | sort -u)
+            echo ${LIST_CHECK_FILES[@]}
+            CUR_DIR=$(pwd)
+            for file in ${LIST_CHECK_FILES[@]}
+            do
+              cd $file
+              ls
+              $CUR_DIR/client/bin/clippy validate
+              cd $CUR_DIR
+            done
+
+    - name: Run tests
+      run: |
+            git fetch origin master:refs/remotes/origin/master
+            BRANCH_VAR=$(git rev-parse origin/master)
+            CURRENT_BRANCH=$(git branch --show-current)
+            echo ${CURRENT_BRANCH}
+            LIST_CHECK_FILES=$(git diff --name-only ${BRANCH_VAR} -- tasks/${CURRENT_BRANCH} | grep '\.cpp\|\.h\|\.hpp' | xargs dirname | sort -u)
+            echo ${LIST_CHECK_FILES[@]}
+            CUR_DIR=$(pwd)
+            for file in ${LIST_CHECK_FILES[@]}
+            do
+              cd $file
+              ls
+              $CUR_DIR/client/bin/clippy test
+              cd $CUR_DIR
+            done
