@@ -1,142 +1,282 @@
 #pragma once
 
-#include <fmt/core.h>
-
-#include <cstdlib>
 #include <functional>
 #include <iterator>
 #include <utility>
 #include <vector>
 
-template <typename Key, typename Value, typename Compare = std::less<Key>>
+template <class Key, class Value, class Compare = std::less<Key>>
 class Map {
+private:
+    struct Node {
+        std::pair<const Key, Value> kv;
+        Node* left;
+        Node* right;
+        Node(const Key& k, const Value& v) : kv(k, v), left(nullptr), right(nullptr) {
+        }
+    };
 
-    class Node;
+    struct NotFound final {};
+
+    Node* root_ = nullptr;
+    size_t sz_ = 0;
+    Compare comp_{};
+
+    Node** LinkTo(const Key& key) {
+        Node** link = &root_;
+        while (*link) {
+            if (comp_(key, (*link)->kv.first)) {
+                link = &((*link)->left);
+            } else if (comp_((*link)->kv.first, key)) {
+                link = &((*link)->right);
+            } else {
+                break;
+            }
+        }
+        return link;
+    }
+
+    static void DeleteSubtree(Node* n) {
+        if (!n) {
+            return;
+        }
+        DeleteSubtree(n->left);
+        DeleteSubtree(n->right);
+        delete n;
+    }
 
 public:
-    class MapIterator {
+    class Iterator {
     public:
-        // NOLINTNEXTLINE
-        using value_type = std::pair<const Key, Value>;
-        // NOLINTNEXTLINE
-        using reference_type = value_type&;
-        // NOLINTNEXTLINE
-        using pointer_type = value_type*;
-        // NOLINTNEXTLINE
-        using difference_type = std::ptrdiff_t;
-        // NOLINTNEXTLINE
-        using iterator_category = std::forward_iterator_tag;
+        using ValueType = std::pair<const Key, Value>;
+        using Reference = ValueType&;
+        using Pointer = ValueType*;
+        using DifferenceType = std::ptrdiff_t;
+        using IteratorCategory = std::forward_iterator_tag;
 
-        inline bool operator==(const MapIterator&) const {
-            std::abort();  // Not implemented
-        };
+        Iterator() = default;
 
-        inline bool operator!=(const MapIterator&) const {
-            std::abort();  // Not implemented
-        };
+        Reference operator*() const {
+            return cur_->kv;
+        }
+        Pointer operator->() const {
+            return &cur_->kv;
+        }
 
-        inline reference_type operator*() const {
-            std::abort();  // Not implemented
-        };
+        bool operator==(const Iterator& o) const noexcept {
+            return cur_ == o.cur_;
+        }
+        bool operator!=(const Iterator& o) const noexcept {
+            return cur_ != o.cur_;
+        }
 
-        MapIterator& operator++() {
-            std::abort();  // Not implemented
-        };
+        Iterator& operator++() {
+            if (!cur_) {
+                return *this;
+            }
+            if (cur_->right) {
+                cur_ = cur_->right;
+                while (cur_->left) {
+                    st_.push_back(cur_);
+                    cur_ = cur_->left;
+                }
+                return *this;
+            }
+            while (!st_.empty() && st_.back()->right == cur_) {
+                cur_ = st_.back();
+                st_.pop_back();
+            }
+            if (st_.empty()) {
+                cur_ = nullptr;
+            } else {
+                cur_ = st_.back();
+                st_.pop_back();
+            }
+            return *this;
+        }
 
-        MapIterator operator++(int) {
-            std::abort();  // Not implemented
-        };
-
-        inline pointer_type operator->() const {
-            std::abort();  // Not implemented
-        };
-
-    private:
-        explicit MapIterator(const Node*) {
-            // Not implemented
+        Iterator operator++(int) {
+            Iterator tmp = *this;
+            ++(*this);
+            return tmp;
         }
 
     private:
-        Node* current_;
+        friend class Map<Key, Value, Compare>;
+
+        explicit Iterator(Node* root) {
+            if (!root) {
+                cur_ = nullptr;
+                return;
+            }
+            Node* cur = root;
+            while (cur->left) {
+                st_.push_back(cur);
+                cur = cur->left;
+            }
+            cur_ = cur;
+        }
+
+        static Iterator FromTarget(Node* root, Node* target) {
+            Iterator it;
+            if (!target) {
+                return it;
+            }
+            Node* cur = root;
+            while (cur && cur != target) {
+                it.st_.push_back(cur);
+                if (Compare{}(target->kv.first, cur->kv.first)) {
+                    cur = cur->left;
+                } else {
+                    cur = cur->right;
+                }
+            }
+            it.cur_ = target;
+            return it;
+        }
+
+        Node* cur_ = nullptr;
+        std::vector<Node*> st_;
     };
 
-    inline MapIterator Begin() const noexcept {
-        std::abort();  // Not implemented
+    Map() = default;
+    ~Map() {
+        Clear();
     }
 
-    inline MapIterator End() const noexcept {
-        std::abort();  // Not implemented
+    Iterator Begin() const noexcept {
+        return Iterator(root_);
+    }
+    Iterator End() const noexcept {
+        return Iterator();
     }
 
-    Map() {
-        // Not implemented
+    Value& operator[](const Key& key) {
+        Node** link = LinkTo(key);
+        if (*link) {
+            return (*link)->kv.second;
+        }
+        *link = new Node(key, Value{});
+        ++sz_;
+        return (*link)->kv.second;
     }
 
-    Value& operator[](const Key& /*key*/) {
-        std::abort();  // Not implemented
+    void Insert(const std::pair<const Key, Value>& p) {
+        Node** link = LinkTo(p.first);
+        if (*link) {
+            (*link)->kv.second = p.second;
+            return;
+        }
+        *link = new Node(p.first, p.second);
+        ++sz_;
     }
 
-    inline bool IsEmpty() const noexcept {
-        std::abort();  // Not implemented
+    void Insert(std::initializer_list<std::pair<const Key, Value>> list) {
+        for (const auto& x : list) {
+            Insert(x);
+        }
     }
 
-    inline size_t Size() const noexcept {
-        std::abort();  // Not implemented
+    void Erase(const Key& key) {
+        Node** link = LinkTo(key);
+        Node* z = *link;
+        if (!z) {
+            throw NotFound{};
+        }
+
+        if (!z->left) {
+            *link = z->right;
+            delete z;
+        } else if (!z->right) {
+            *link = z->left;
+            delete z;
+        } else {
+            Node** succ = &(z->right);
+            while ((*succ)->left) {
+                succ = &((*succ)->left);
+            }
+            Node* s = *succ;
+            *succ = s->right;
+            s->left = z->left;
+            s->right = z->right;
+            *link = s;
+            delete z;
+        }
+        --sz_;
     }
 
-    void Swap(Map& a) {
-        static_assert(std::is_same<decltype(this->comp), decltype(a.comp)>::value,
-                      "The compare function types are different");
-        // Not implemented
+    Iterator Find(const Key& key) const {
+        Node* cur = root_;
+        while (cur) {
+            if (comp_(key, cur->kv.first)) {
+                cur = cur->left;
+            } else if (comp_(cur->kv.first, key)) {
+                cur = cur->right;
+            } else {
+                return Iterator::FromTarget(root_, cur);
+            }
+        }
+        return End();
     }
 
-    std::vector<std::pair<const Key, Value>> Values(bool /*is_increase=true*/) const noexcept {
-        std::abort();  // Not implemented
-    }
-
-    void Insert(const std::pair<const Key, Value>& /*val*/) {
-        // Not implemented
-    }
-
-    void Insert(const std::initializer_list<std::pair<const Key, Value>>& /*values*/) {
-        // Not implemented
-    }
-
-    void Erase(const Key& /*key*/) {
-        // Not implemented
+    std::vector<std::pair<const Key, Value>> Values(bool inc = true) const noexcept {
+        std::vector<std::pair<const Key, Value>> out;
+        out.reserve(sz_);
+        if (inc) {
+            std::vector<Node*> st;
+            Node* cur = root_;
+            while (cur || !st.empty()) {
+                while (cur) {
+                    st.push_back(cur);
+                    cur = cur->left;
+                }
+                cur = st.back();
+                st.pop_back();
+                out.push_back(cur->kv);
+                cur = cur->right;
+            }
+        } else {
+            std::vector<Node*> st;
+            Node* cur = root_;
+            while (cur || !st.empty()) {
+                while (cur) {
+                    st.push_back(cur);
+                    cur = cur->right;
+                }
+                cur = st.back();
+                st.pop_back();
+                out.push_back(cur->kv);
+                cur = cur->left;
+            }
+        }
+        return out;
     }
 
     void Clear() noexcept {
-        // Not implemented
+        DeleteSubtree(root_);
+        root_ = nullptr;
+        sz_ = 0;
     }
 
-    MapIterator Find(const Key& /*key*/) const {
-        std::abort();  // Not implemented
+    void Swap(Map& other) noexcept {
+        using std::swap;
+        swap(root_, other.root_);
+        swap(sz_, other.sz_);
+        swap(comp_, other.comp_);
     }
 
-    ~Map() {
-        // Not implemented
+    bool IsEmpty() const noexcept {
+        return sz_ == 0;
     }
-
-private:
-    class Node {
-        friend class MapIterator;
-        friend class Map;
-
-    private:
-        /*???*/
-    };
-    /*???*/
-
-private:
-    Compare comp;
-    /*???*/
+    size_t Size() const noexcept {
+        return sz_;
+    }
 };
 
+// перегрузка std::swap для нашего типа
 namespace std {
-// Global swap overloading
-template <typename Key, typename Value>
-void swap(Map<Key, Value>& a, Map<Key, Value>& b) {
+template <class Key, class Value, class Compare>
+inline void swap(Map<Key, Value, Compare>& a, Map<Key, Value, Compare>& b) noexcept {  // NOLINT
     a.Swap(b);
 }
 }  // namespace std
