@@ -1,23 +1,41 @@
 #pragma once
 
-#include <fmt/core.h>
-
 #include <exception>
 #include <string>
 
 namespace filesystem::exceptions {
 
-class FileNotFoundException : std::exception {
-public:
-    explicit FileNotFoundException(const std::string& filename) : error_message_(filename) {
+struct FileNotFoundException : std::exception {
+    explicit FileNotFoundException(const std::string& what_arg) : msg_("FileNotFound: " + what_arg) {
     }
-
     const char* what() const noexcept override {
-        return error_message_.data();
+        return msg_.c_str();
     }
 
 private:
-    std::string_view error_message_;
+    std::string msg_;
 };
 
-}  // end namespace filesystem::exceptions
+struct FileExistsException : std::exception {
+    explicit FileExistsException(const std::string& what_arg) : msg_("FileExists: " + what_arg) {
+    }
+    const char* what() const noexcept override {
+        return msg_.c_str();
+    }
+
+private:
+    std::string msg_;
+};
+
+struct DirectoryNotFoundException : std::exception {
+    explicit DirectoryNotFoundException(const std::string& what_arg) : msg_("DirectoryNotFound: " + what_arg) {
+    }
+    const char* what() const noexcept override {
+        return msg_.c_str();
+    }
+
+private:
+    std::string msg_;
+};
+
+}  // namespace filesystem::exceptions

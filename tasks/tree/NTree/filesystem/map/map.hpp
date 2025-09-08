@@ -1,81 +1,204 @@
 #pragma once
 
-#include <cstdlib>
 #include <functional>
 #include <utility>
 #include <vector>
 
-template <typename Key, typename Value, typename Compare = std::less<Key>>
+namespace filesystem {
+
+template <class Key, class Value, class Compare = std::less<Key>>
 class Map {
+private:
+    struct Node {
+        std::pair<Key, Value> kv;
+        Node* left;
+        Node* right;
+        Node* parent;
+        Node(const Key& k, const Value& v, Node* p = nullptr) : kv(k, v), left(nullptr), right(nullptr), parent(p) {
+        }
+    };
+
 public:
-    Map() {
-        // Not implemented
+    Map() : root_(nullptr), sz_(0), comp_() {
+    }
+    ~Map() {
+        Clear();
     }
 
-    Value& operator[](const Key& /*key*/) {
-        std::abort();  // Not implemented
+    // вставка или перезапись
+    void Insert(const std::pair<const Key, Value>& p) {
+        if (!root_) {
+            root_ = new Node(p.first, p.second);
+            ++sz_;
+            return;
+        }
+        Node* cur = root_;
+        Node* par = nullptr;
+        while (cur) {
+            par = cur;
+            if (comp_(p.first, cur->kv.first)) {
+                cur = cur->left;
+            } else if (comp_(cur->kv.first, p.first)) {
+                cur = cur->right;
+            } else {
+                cur->kv.second = p.second;
+                return;
+            }
+        }
+        Node* nn = new Node(p.first, p.second, par);
+        if (comp_(p.first, par->kv.first)) {
+            par->left = nn;
+        } else {
+            par->right = nn;
+        }
+        ++sz_;
     }
 
-    inline bool IsEmpty() const noexcept {
-        std::abort();  // Not implemented
+    // доступ/создание по ключу
+    Value& operator[](const Key& key) {
+        Node* cur = root_;
+        Node* par = nullptr;
+        while (cur) {
+            par = cur;
+            if (comp_(key, cur->kv.first)) {
+                cur = cur->left;
+            } else if (comp_(cur->kv.first, key)) {
+                cur = cur->right;
+            } else {
+                return cur->kv.second;
+            }
+        }
+        Node* nn = new Node(key, Value{}, par);
+        if (!par) {
+            root_ = nn;
+        } else if (comp_(key, par->kv.first)) {
+            par->left = nn;
+        } else {
+            par->right = nn;
+        }
+        ++sz_;
+        return nn->kv.second;
     }
 
-    inline size_t Size() const noexcept {
-        std::abort();  // Not implemented
+    bool Find(const Key& key) const noexcept {
+        return FindNode(key) != nullptr;
     }
 
-    void Swap(Map& a) {
-        static_assert(std::is_same<decltype(this->comp), decltype(a.comp)>::value,
-                      "The compare function types are different");
-        // Not implemented
+    void Erase(const Key& key) {
+        Node* z = FindNode(key);
+        if (!z) {
+            return;  // в наших сценариях удаление по наличию проверяют заранее
+        }
+        if (!z->left || !z->right) {
+            Node* c = z->left ? z->left : z->right;
+            if (!z->parent) {
+                root_ = c;
+                if (c) {
+                    c->parent = nullptr;
+                }
+            } else {
+                if (z->parent->left == z) {
+                    z->parent->left = c;
+                } else {
+                    z->parent->right = c;
+                }
+                if (c) {
+                    c->parent = z->parent;
+                }
+            }
+            delete z;
+            --sz_;
+            return;
+        }
+        // два потомка: заменить на следующий по возрастанию
+        Node* s = z->right;
+        while (s->left) {
+            s = s->left;
+        }
+        z->kv.first = s->kv.first;
+        z->kv.second = s->kv.second;
+        // удалить successor (у него нет левого сына)
+        if (s->parent->left == s) {
+            s->parent->left = s->right;
+        } else {
+            s->parent->right = s->right;
+        }
+        if (s->right) {
+            s->right->parent = s->parent;
+        }
+        delete s;
+        --sz_;
     }
 
-    std::vector<std::pair<const Key, Value>> Values(bool /*is_increase=true*/) const noexcept {
-        std::abort();  // Not implemented
-    }
-
-    void Insert(const std::pair<const Key, Value>& /*val*/) {
-        // Not implemented
-    }
-
-    void Insert(const std::initializer_list<std::pair<const Key, Value>>& /*values*/) {
-        // Not implemented
-    }
-
-    void Erase(const Key& /*key*/) {
-        // Not implemented
+    std::vector<std::pair<const Key, Value>> Values(bool inc = true) const noexcept {
+        std::vector<std::pair<const Key, Value>> out;
+        out.reserve(sz_);
+        if (inc) {
+            Inorder(root_, out);
+        } else {
+            ReverseInorder(root_, out);
+        }
+        return out;
     }
 
     void Clear() noexcept {
-        // Not implemented
+        DeleteSubtree(root_);
+        root_ = nullptr;
+        sz_ = 0;
     }
 
-    bool Find(const Key& /*key*/) const {
-        std::abort();  // Not implemented
+    bool IsEmpty() const noexcept {
+        return sz_ == 0;
     }
-
-    ~Map() {
-        // Not implemented
+    size_t Size() const noexcept {
+        return sz_;
     }
 
 private:
-    class Node {
-        friend class Map;
+    Node* root_;
+    size_t sz_;
+    Compare comp_;
 
-    private:
-        /*???*/
-    };
-    /*???*/
+    Node* FindNode(const Key& key) const {
+        Node* cur = root_;
+        while (cur) {
+            if (comp_(key, cur->kv.first)) {
+                cur = cur->left;
+            } else if (comp_(cur->kv.first, key)) {
+                cur = cur->right;
+            } else {
+                return cur;
+            }
+        }
+        return nullptr;
+    }
 
-private:
-    Compare comp;
-    /*???*/
+    static void DeleteSubtree(Node* n) {
+        if (!n) {
+            return;
+        }
+        DeleteSubtree(n->left);
+        DeleteSubtree(n->right);
+        delete n;
+    }
+
+    static void Inorder(Node* n, std::vector<std::pair<const Key, Value>>& v) {
+        if (!n) {
+            return;
+        }
+        Inorder(n->left, v);
+        v.emplace_back(n->kv.first, n->kv.second);
+        Inorder(n->right, v);
+    }
+
+    static void ReverseInorder(Node* n, std::vector<std::pair<const Key, Value>>& v) {
+        if (!n) {
+            return;
+        }
+        ReverseInorder(n->right, v);
+        v.emplace_back(n->kv.first, n->kv.second);
+        ReverseInorder(n->left, v);
+    }
 };
 
-namespace std {
-// Global swap overloading
-template <typename Key, typename Value>
-void swap(Map<Key, Value>& a, Map<Key, Value>& b) {
-    a.Swap(b);
-}
-}  // namespace std
+}  // namespace filesystem
