@@ -6,15 +6,12 @@ namespace filesystem {
 
 class File {
 public:
-    void Read(size_t /*bytes*/) const;
-
-    // overwrite
-    void Write();
-
-    void Append();
+    File();
+    void Write(const std::string& data, bool overwrite);
+    const std::string& GetContent() const;
 
 private:
-    std::string content;
+    std::string content_;
 };
 
-}  // end namespace filesystem
+}  // namespace filesystem
