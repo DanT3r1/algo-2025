@@ -2,16 +2,19 @@
 
 namespace filesystem {
 
-void File::Read(size_t /*bytes*/) const {
-    std::abort();  // Not implemented
+File::File() : content_() {
 }
 
-void File::Write() {
-    // Not implemented
+void File::Write(const std::string& data, bool overwrite) {
+    if (overwrite) {
+        content_ = data;
+    } else {
+        content_ += data;
+    }
 }
 
-void File::Append() {
-    // Not implemented
+const std::string& File::GetContent() const {
+    return content_;
 }
 
-}  // end namespace filesystem
+}  // namespace filesystem
